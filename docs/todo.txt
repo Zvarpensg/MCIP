@@ -1,6 +1,14 @@
 TODO
  - ARP
+  - ARP Probe
  - IP
+  - Subnets
+ - TCP/UDP
+ - DHCP
  - VLAN support
  - Error checking
  - Documentation
+ - Decide if some superfluous header fields (lengths, checksums, etc) should be implemented for "correctness"
+ - Clean up library API
+  - Make different core protocol types more extensible
+ 

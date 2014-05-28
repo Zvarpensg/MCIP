@@ -1,10 +1,3 @@
---
--- MineCraft Internet Protocol / Zvarpensg
--- Client
--- Written by: supercorey/CoreSystems
--- Version 0.3
---
-
 os.loadAPI("json")
 os.loadAPI("mcip")
 

@@ -3,5 +3,16 @@
 	"source": 1, // source MAC address
 	"target": 2, // destination MAC address
 	"vlan": 1, // OPTIONAL: for 802.1Q tagging; future use
+	"ethertype": 2048, // protocol: IPv4 (or 2054 for ARP)
 	"payload": "" // frame contents
+}
+
+// ARP - Layer 2 (encapsulated by Ethernet)
+{
+	"protocol": 2048, // protocol that ARP is resolving for; 2048 -> IPv4
+	"operation": 1, // 1 = request, 2 = reply
+	"sha": 11, // sender hardware address
+	"spa": "192.168.1.1", // sender protocol address
+	"tha": 14, // target hardware address (ignored when operation == 1)
+	"tpa": "192.168.1.2" // target protocol address
 }
