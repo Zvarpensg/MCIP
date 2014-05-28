@@ -1,0 +1,6 @@
+TODO
+ - ARP
+ - IP
+ - VLAN support
+ - Error checking
+ - Documentation
