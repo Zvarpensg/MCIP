@@ -16,3 +16,11 @@
 	"tha": 14, // target hardware address (ignored when operation == 1)
 	"tpa": "192.168.1.2" // target protocol address
 }
+
+// IPv4 - Layer 3
+{
+	"ttl": 128, // Time to Live; used as a hop count
+	"protocol": 17, // protocol: UDP (or 6 for TCP, or 1 for ICMP)
+	"source": "192.168.1.1", // source IP address
+	"destination": "192.168.1.2" // destination IP address
+}
