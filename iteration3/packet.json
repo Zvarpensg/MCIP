@@ -1,7 +1,0 @@
-// Ethernet - Layer 2
-{
-	"source": 1, // source MAC address
-	"target": 2, // destination MAC address
-	"vlan": 1, // OPTIONAL: for 802.1Q tagging; future use
-	"payload": "" // frame contents
-}
