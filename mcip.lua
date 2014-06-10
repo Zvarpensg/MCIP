@@ -1,6 +1,10 @@
-os.loadAPI("json")
+os.loadAPI("lib/json")
 
 -- CONSTANTS
+-- Program Constants
+VERBOSITY_RAW  = 1
+VERBOSITY_LINK = 2
+VERBOSITY_NET  = 3
 -- Modem API (Layer 1)
 CHANNEL = 1337
 -- Hardware Addresses
@@ -15,7 +19,7 @@ ARP_TEMPLATE = json.decode("{ 'protocol': 2048, 'operation': 1, 'sha': 0, 'spa':
 ARP_REQUEST = 1
 ARP_REPLY   = 2
 -- IPv4 (Layer 3)
-IPV4_TEMPLATE = json.decode("{ 'ttl': 128, 'protocol': 17, 'source': '192.168.1.1', 'destination': '192.168.1.2' }")
+IPV4_TEMPLATE = json.decode("{ 'ttl': 128, 'protocol': 17, 'source': '192.168.1.1', 'destination': '192.168.1.2', 'payload': '' }")
 IPV4_BROADCAST = "255.255.255.255"
 IPV4_LOCALHOST = "127.0.0.1"
 IPV4_PROTOCOL_ICMP = 1
@@ -23,10 +27,16 @@ IPV4_PROTOCOL_TCP  = 6
 IPV4_PROTOCOL_UDP  = 17
 -- END CONSTANTS
 
+-- Processing Variables
+events_receive = { arp_event, ipv4_queue } -- commands to be run on packet received
+event_verbosity = VERBOSITY_NET -- level of packets sent to primary program
+
 -- Runtime Variables
 running = true -- are networking functions taking place?
 interfaces = {} -- table associating interface names with modems
 interface_sides = {} -- table associating block sides with interface names
+
+ipv4_packet_queue = {}
 
 -- Networking Variables
 arp_cache = {} -- table for caching ARP lookups. arp_cache[protocol address] = HW address
@@ -79,45 +89,31 @@ function get_interface (side)
 	return interface_sides[side]
 end
 
+function receive_raw ()
+	local event, modem_side, sender_channel, reply_channel, message, distance = os.pullEventRaw("modem_message") -- block for physical message
+	local packet = json.decode(message) -- parse JSON to Lua object
+	local interface = get_interface(modem_side)
+
+	for i, event in ipairs(events_receive) do -- run events, passing in parsed packet
+		event(interface, packet)
+	end
+
+	return interface, packet
+end
+
 function receive ()
-	while true do
-		local interface, message, source, target, type, payload = receive_promiscuous()
-		if target == MAC or target == MAC_BROADCAST then
-			do return interface, message, source, target, type, payload end
-		end
+	local interface, packet = receive_raw()
+	if ((event_verbosity == 1) or
+		(event_verbosity == 2 and (target == MAC or target == MAC_BROADCAST)) or 
+		(event_verbosity == 2 and (target == MAC or target == MAC_BROADCAST) and packet.ethertype == ETHERNET_TYPE_IPV4)) then 
+		return interface, packet
+	else
+		return receive()
 	end
 end
 
-function receive_promiscuous ()
-	local event, modem_side, sender_channel, reply_channel, message, distance = os.pullEventRaw("modem_message")
-	local packet = json.decode(message)
-
-	if packet.ethertype == ETHERNET_TYPE_ARP then
-		local arp = json.decode(packet.payload)
-		if arp.operation == ARP_REQUEST then
-			if arp.tha == MAC then 
-				arp_reply(get_interface[modem_side], arp.sha, arp.spa)
-			end
-		end
-		arp_cache[arp.spa] = arp.sha
-	end
-
-	return get_interface(modem_side), message, packet.source, packet.target, packet.ethertype, packet.payload
-end
-
--- Intended for use with Parallel.waitForAll; parallel.waitForAll(mcip.receive_event, <main loop>)
-function receive_event ()
-	while running do
-		local interface, raw, source, target, type, payload = receive()
-		os.queueEvent("mcip_message", interface, source, target, type, payload)
-	end
-end
-
-function receive_event_promiscuous ()
-	while running do
-		local interface, raw, source, target, type, payload = receive_promiscuous()
-		os.queueEvent("mcip_message", interface, source, target, type, payload)
-	end
+function set_verbosity (verbosity)
+	event_verbosity = verbosity
 end
 
 -- Ethernet
@@ -141,7 +137,7 @@ function arp_send (interface, protocol, operation, sha, spa, tha, tpa)
 	packet.tha = tha
 	packet.tpa = tpa
 
-	ethernet_send(interface, (operation == ARP_REQUEST and MAC_BROADCAST or tha), ETHERNET_TYPE_ARP, json.encode(packet))
+	ethernet_send(interface, (operation == ARP_REQUEST and MAC_BROADCAST or tha), ETHERNET_TYPE_ARP, packet)
 end
 
 function arp_request (interface, tpa)
@@ -154,6 +150,24 @@ function arp_reply (interface, tha, tpa)
 	arp_send(interface, ETHERNET_TYPE_ARP, ARP_REPLY, MAC, ipv4_address, tha, tpa)
 end
 
+function arp_receive ()
+	if next(arp_cache) ~= nil then
+		receive_raw()
+	end
+end
+
+function arp_event (interface, packet)
+	if packet.ethertype == ETHERNET_TYPE_ARP then
+		local arp = packet.payload
+		if arp.operation == ARP_REQUEST then
+			if arp.tha == MAC then 
+				arp_reply(get_interface[modem_side], arp.sha, arp.spa)
+			end
+		end
+		arp_cache[arp.spa] = arp.sha
+	end
+end
+
 -- IPv4
 function ipv4_initialize (address, subnet, gateway)
 	if next(interfaces) == nil then
@@ -161,9 +175,41 @@ function ipv4_initialize (address, subnet, gateway)
 	end
 
 	ipv4_address = address
+	ipv4_subnet = subnet
+	ipv4_gateway = gateway
 	arp_cache[IPV4_BROADCAST] = MAC_BROADCAST
 end 
 
-function ipv4_send (interface, target, message)
-	-- TODO: Implement.
+function ipv4_send (interface, destination, protocol, ttl, payload)
+	if arp_cache[destination] == nil then
+		local data = json.decode("{ 'interface': '', 'destination': '', 'protocol': 0, 'ttl': 0, 'payload': '' }")
+		data.interface = interface
+		data.destination = destination
+		data.protocol = protocol
+		data.ttl = ttl
+		data.payload = payload
+
+		arp_request(interface, destination)
+		ipv4_packet_queue = table.insert(ipv4_packet_queue, json.encode(data))
+		return
+	end
+
+	local packet = IPV4_TEMPLATE
+	packet.source = ipv4_address
+	packet.destination = destination
+	packet.protocol = protocol
+	packet.ttl = ttl
+	packet.payload = payload
+
+	ethernet_send(interface, arp_cache[destination], ETHERNET_TYPE_IPV4, packet)
+end
+
+function ipv4_queue (interface, packet)
+	for i, queue_packet in ipairs(ipv4_packet_queue) do
+		local data = json.decode(queue_packet)
+		if arp_cache[data.destination] ~= nil then
+			ipv4_send(data.interface, data.destination, data.protocol, data.ttl, data.payload)
+			ipv4_packet_queue = table.remove(ipv4_packet_queue, queue_packet)
+		end
+	end
 end

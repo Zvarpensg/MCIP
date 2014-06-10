@@ -3,13 +3,15 @@ TODO
   - ARP Probe
  - IP
   - Subnets
+  - TTL
  - ICMP
- - TCP/UDP
+ - UDP
+ - TCP
  - DHCP
  - VLAN support
  - Error checking
+ - Members public/private
  - Documentation
  - Decide if some superfluous header fields (lengths, checksums, etc) should be implemented for "correctness"
  - Clean up library API
   - Make different core protocol types more extensible
- 

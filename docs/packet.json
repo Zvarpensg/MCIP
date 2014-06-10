@@ -22,5 +22,6 @@
 	"ttl": 128, // Time to Live; used as a hop count
 	"protocol": 17, // protocol: UDP (or 6 for TCP, or 1 for ICMP)
 	"source": "192.168.1.1", // source IP address
-	"destination": "192.168.1.2" // destination IP address
+	"destination": "192.168.1.2", // destination IP address
+	"payload": "" // packet contents
 }
