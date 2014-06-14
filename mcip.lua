@@ -3,19 +3,32 @@ os.loadAPI("lib/json")
 -- CONSTANTS
 -- Program Constants
 
+---- Filtering
+ETHERNET = 1
+ARP = 2
+IPV4 = 3
+
+DISABLED = 0
+ENABLED = 1
+PROMISCUOUS = 2
+
 -- Modem API (Layer 1)
 CHANNEL = 1337
+
 -- Hardware Addresses
 MAC = os.getComputerID() -- unique computer identifier
 MAC_BROADCAST = 65534
+
 -- Ethernet (Layer 2)
 ETHERNET_TEMPLATE = json.decode("{'source': 0, 'target': 0, 'vlan': 1, 'ethertype': 2048, 'payload': ''}")
 ETHERNET_TYPE_IPV4 = 0x0800
 ETHERNET_TYPE_ARP  = 0x0806
+
 -- ARP (Layer 2)
 ARP_TEMPLATE = json.decode("{ 'protocol': 2048, 'operation': 1, 'sha': 0, 'spa': '127.0.0.1', 'tha': 0, 'tpa': '127.0.0.1' }")
 ARP_REQUEST = 1
 ARP_REPLY   = 2
+
 -- IPv4 (Layer 3)
 IPV4_TEMPLATE = json.decode("{ 'ttl': 128, 'protocol': 17, 'source': '192.168.1.1', 'destination': '192.168.1.2', 'payload': '' }")
 IPV4_BROADCAST = "255.255.255.255"
@@ -28,12 +41,14 @@ IPV4_PROTOCOL_UDP  = 17
 -- Runtime Variables
 interfaces = {} -- table associating interface names with modems
 interface_sides = {} -- table associating block sides with interface names
+packet_filters = {} -- protocol type with disabled/enabled/promiscuous
 
 ipv4_packet_queue = {}
 
 -- Networking Variables
 arp_cache = {} -- table for caching ARP lookups. arp_cache[protocol address] = HW address
 
+ipv4_enabled = false
 ipv4_address = IPV4_LOCALHOST -- TODO: find better defaults
 ipv4_subnet  = "255.255.255.0"
 ipv4_gateway = "192.168.1.254"
@@ -67,17 +82,8 @@ function stop ()
 	interfaces = {}
 end
 
--- TODO: Remove once it won't break everything and has a valid replacement.
-function send (interface, target, message)
-	ethernet_send(interface, target, ETHERNET_TYPE_IPV4, message)
-end
-
 function send_raw (interface, frame)
 	interfaces[interface].transmit(CHANNEL, CHANNEL, frame)
-end
-
-function get_interface (side)
-	return interface_sides[side]
 end
 
 function receive_raw ()
@@ -85,8 +91,9 @@ function receive_raw ()
 	local packet = json.decode(message) -- parse JSON to Lua object
 	local interface = get_interface(modem_side)
 
+	-- On Receive Events
 	arp_event(interface, packet)
-	ipv4_queue(interface, packet)
+	ipv4_event(interface, packet)
 
 	return interface, packet
 end
@@ -94,9 +101,44 @@ end
 function loop ()
 	while true do
 		local interface, packet = receive_raw()
-		os.queueEvent("mcip", interface, packet)
+		local send = false
+
+		for protocol, state in pairs(packet_filters) do
+			if state ~= DISABLED then
+				if     protocol == ETHERNET then 
+					if packet.target == MAC or state == PROMISCUOUS then send = true end
+				elseif protocol == ARP then
+					if packet.ethertype == ETHERNET_TYPE_ARP then
+						if packet.payload.tha == MAC 
+							or packet.payload.tpa == ipv4_address 
+							or state == PROMISCUOUS then send = true end
+					end
+				elseif protocol == IPV4 then
+					if packet.ethertype == ETHERNET_TYPE_IPV4 then
+						if packet.payload.destination == ipv4_address or state == PROMISCUOUS then send = true end
+					end
+				end
+			end
+		end
+
+		if send then os.queueEvent("mcip", interface, packet) end
 	end
 end
+
+function get_interface (side)
+	return interface_sides[side]
+end
+
+function filter (protocol, state)
+	packet_filters[protocol] = state
+end
+
+--[[function filter_state (protocol)
+	if packet_filters[protocol] == nil then
+		return DISABLED
+	end
+	return packet_filters[protocol]
+end]]--
 
 -- Ethernet
 function ethernet_send (interface, target, type, message)
@@ -150,6 +192,7 @@ function ipv4_initialize (address, subnet, gateway)
 		initialize()
 	end
 
+	ipv4_enabled = true
 	ipv4_address = address
 	ipv4_subnet = subnet
 	ipv4_gateway = gateway
@@ -181,7 +224,7 @@ function ipv4_send (interface, destination, protocol, ttl, payload)
 	ethernet_send(interface, arp_cache[destination], ETHERNET_TYPE_IPV4, packet)
 end
 
-function ipv4_queue (interface, packet)
+function ipv4_event (interface, packet)
 	if ipv4_packet_queue ~= nil then
 		for i, queue_packet in ipairs(ipv4_packet_queue) do
 			local data = json.decode(queue_packet)

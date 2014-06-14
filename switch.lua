@@ -2,6 +2,7 @@ os.loadAPI("lib/json")
 os.loadAPI("mcip")
 
 mcip.ipv4_initialize("192.168.1.3", "255.255.255.0", "192.168.1.254")
+mcip.filter(mcip.ETHERNET, mcip.PROMISCUOUS)
 
 parallel.waitForAny(
 	function()
