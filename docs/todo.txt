@@ -1,17 +1,23 @@
 TODO
- - ARP
-  - ARP Probe
- - IP
-  - Subnets
-  - TTL
- - ICMP
- - UDP
- - TCP
- - DHCP
+ - IPv4 non-promiscuous (but with choice)
+ - Protocols
+  - ARP
+   - ARP Probe
+  - IP
+   - Subnets
+   - TTL
+  - ICMP
+  - UDP
+  - TCP
+  - DHCP
+  - SSH
+  - [T]FTP
  - VLAN support
+ - Settings per interface
  - Error checking
  - Members public/private
  - Documentation
  - Decide if some superfluous header fields (lengths, checksums, etc) should be implemented for "correctness"
  - Clean up library API
   - Make different core protocol types more extensible
+  - Implement filtering for incoming packets

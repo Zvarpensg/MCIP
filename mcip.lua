@@ -2,9 +2,7 @@ os.loadAPI("lib/json")
 
 -- CONSTANTS
 -- Program Constants
-VERBOSITY_RAW  = 1
-VERBOSITY_LINK = 2
-VERBOSITY_NET  = 3
+
 -- Modem API (Layer 1)
 CHANNEL = 1337
 -- Hardware Addresses
@@ -27,12 +25,7 @@ IPV4_PROTOCOL_TCP  = 6
 IPV4_PROTOCOL_UDP  = 17
 -- END CONSTANTS
 
--- Processing Variables
-events_receive = { arp_event, ipv4_queue } -- commands to be run on packet received
-event_verbosity = VERBOSITY_NET -- level of packets sent to primary program
-
 -- Runtime Variables
-running = true -- are networking functions taking place?
 interfaces = {} -- table associating interface names with modems
 interface_sides = {} -- table associating block sides with interface names
 
@@ -65,7 +58,6 @@ function initialize ()
 			interface_sides[side] = interface
 		end
 	end
-	running = true
 end
 
 function stop ()
@@ -73,7 +65,6 @@ function stop ()
 		modem.close(CHANNEL)
 	end
 	interfaces = {}
-	running = false
 end
 
 -- TODO: Remove once it won't break everything and has a valid replacement.
@@ -94,26 +85,17 @@ function receive_raw ()
 	local packet = json.decode(message) -- parse JSON to Lua object
 	local interface = get_interface(modem_side)
 
-	for i, event in ipairs(events_receive) do -- run events, passing in parsed packet
-		event(interface, packet)
-	end
+	arp_event(interface, packet)
+	ipv4_queue(interface, packet)
 
 	return interface, packet
 end
 
-function receive ()
-	local interface, packet = receive_raw()
-	if ((event_verbosity == 1) or
-		(event_verbosity == 2 and (target == MAC or target == MAC_BROADCAST)) or 
-		(event_verbosity == 2 and (target == MAC or target == MAC_BROADCAST) and packet.ethertype == ETHERNET_TYPE_IPV4)) then 
-		return interface, packet
-	else
-		return receive()
+function loop ()
+	while true do
+		local interface, packet = receive_raw()
+		os.queueEvent("mcip", interface, packet)
 	end
-end
-
-function set_verbosity (verbosity)
-	event_verbosity = verbosity
 end
 
 -- Ethernet
@@ -141,7 +123,7 @@ function arp_send (interface, protocol, operation, sha, spa, tha, tpa)
 end
 
 function arp_request (interface, tpa)
-	if arp_cache[tpa] ~= nil then
+	if arp_cache[tpa] == nil then
 		arp_send(interface, ETHERNET_TYPE_ARP, ARP_REQUEST, MAC, ipv4_address, 0, tpa)
 	end
 end
@@ -150,18 +132,12 @@ function arp_reply (interface, tha, tpa)
 	arp_send(interface, ETHERNET_TYPE_ARP, ARP_REPLY, MAC, ipv4_address, tha, tpa)
 end
 
-function arp_receive ()
-	if next(arp_cache) ~= nil then
-		receive_raw()
-	end
-end
-
 function arp_event (interface, packet)
 	if packet.ethertype == ETHERNET_TYPE_ARP then
 		local arp = packet.payload
 		if arp.operation == ARP_REQUEST then
-			if arp.tha == MAC then 
-				arp_reply(get_interface[modem_side], arp.sha, arp.spa)
+			if arp.tpa == ipv4_address then 
+				arp_reply(interface, arp.sha, arp.spa)
 			end
 		end
 		arp_cache[arp.spa] = arp.sha
@@ -190,6 +166,7 @@ function ipv4_send (interface, destination, protocol, ttl, payload)
 		data.payload = payload
 
 		arp_request(interface, destination)
+		if ipv4_packet_queue == nil then ipv4_packet_queue = {} end
 		ipv4_packet_queue = table.insert(ipv4_packet_queue, json.encode(data))
 		return
 	end
@@ -205,11 +182,13 @@ function ipv4_send (interface, destination, protocol, ttl, payload)
 end
 
 function ipv4_queue (interface, packet)
-	for i, queue_packet in ipairs(ipv4_packet_queue) do
-		local data = json.decode(queue_packet)
-		if arp_cache[data.destination] ~= nil then
-			ipv4_send(data.interface, data.destination, data.protocol, data.ttl, data.payload)
-			ipv4_packet_queue = table.remove(ipv4_packet_queue, queue_packet)
+	if ipv4_packet_queue ~= nil then
+		for i, queue_packet in ipairs(ipv4_packet_queue) do
+			local data = json.decode(queue_packet)
+			if arp_cache[data.destination] ~= nil then
+				ipv4_send(data.interface, data.destination, data.protocol, data.ttl, data.payload)
+				ipv4_packet_queue = table.remove(ipv4_packet_queue, queue_packet)
+			end
 		end
 	end
 end
