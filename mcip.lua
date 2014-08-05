@@ -210,7 +210,7 @@ function ipv4_send (interface, destination, protocol, ttl, payload)
 
 		arp_request(interface, destination)
 		if ipv4_packet_queue == nil then ipv4_packet_queue = {} end
-		ipv4_packet_queue = table.insert(ipv4_packet_queue, json.encode(data))
+		table.insert(ipv4_packet_queue, json.encode(data))
 		return
 	end
 
