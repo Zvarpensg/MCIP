@@ -137,6 +137,17 @@ function filter (protocol, state)
 	packet_filters[protocol] = state
 end
 
+function run_with (user_function)
+	parallel.waitForAny(
+		function()
+			user_function()
+		end,
+		function()
+			loop()
+		end
+	)
+end
+
 --[[function filter_state (protocol)
 	if packet_filters[protocol] == nil then
 		return DISABLED
