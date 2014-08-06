@@ -7,6 +7,7 @@ os.loadAPI("lib/json")
 ETHERNET = 1
 ARP = 2
 IPV4 = 3
+ICMP = 4
 
 DISABLED = 0
 ENABLED = 1
@@ -36,6 +37,9 @@ IPV4_LOCALHOST = "127.0.0.1"
 IPV4_PROTOCOL_ICMP = 1
 IPV4_PROTOCOL_TCP  = 6
 IPV4_PROTOCOL_UDP  = 17
+
+-- ICMP
+ICMP_TEMPLATE = json.decode("{ 'type': 8, 'code':0, payload:''");
 -- END CONSTANTS
 
 -- Runtime Variables
@@ -234,4 +238,14 @@ function ipv4_event (interface, packet)
 			end
 		end
 	end
+end
+
+-- ICMP
+function icmp_send(interface, destination, ttl, type, code, payload)
+	local packet = ICMP_TEMPLATE
+	packet.type = type
+	packet.code = code
+	packet.payload = payload
+
+	ipv4_send(interface, destination, IPV4_PROTOCOL_ICMP, ttl, packet)
 end
