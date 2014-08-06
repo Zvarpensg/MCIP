@@ -4,15 +4,10 @@ os.loadAPI("mcip")
 mcip.ipv4_initialize("192.168.1.3", "255.255.255.0", "192.168.1.254")
 mcip.filter(mcip.ETHERNET, mcip.PROMISCUOUS)
 
-parallel.waitForAny(
-	function()
-		while true do
-			local event, interface, packet = os.pullEvent("mcip")
-			mcip.send_raw((interface == "eth0" and "eth1" or "eth0"), json.encode(packet))
-			print("Forwarded "..json.encode(packet).." from "..interface)
-		end
-	end,
-	function()
-		mcip.loop()
+mcip.run_with(function() 
+	while true do
+		local event, interface, packet = os.pullEvent("mcip")
+		mcip.send_raw((interface == "eth0" and "eth1" or "eth0"), json.encode(packet))
+		print("Forwarded "..json.encode(packet).." from "..interface)
 	end
-)
+end)
