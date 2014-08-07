@@ -37,9 +37,15 @@ IPV4_LOCALHOST = "127.0.0.1"
 IPV4_PROTOCOL_ICMP = 1
 IPV4_PROTOCOL_TCP  = 6
 IPV4_PROTOCOL_UDP  = 17
+IPV4_DEFAULT_TTL = 64
 
--- ICMP
+-- ICMP (Layer 4)
 ICMP_TEMPLATE = json.decode("{ 'type': 8, 'code':0, payload:'' }");
+ICMP_TYPE_ECHO_REPLY = 0
+ICMP_TYPE_DESTINATION_UNREACHABLE = 3
+ICMP_TYPE_ECHO = 8
+ICMP_TEMPLATE_ECHO = json.decode("{ 'identifier': 0, 'sequence': 0, 'payload': '' }")
+
 -- END CONSTANTS
 
 -- Runtime Variables
@@ -56,6 +62,9 @@ ipv4_enabled = false
 ipv4_address = IPV4_LOCALHOST -- TODO: find better defaults
 ipv4_subnet  = "255.255.255.0"
 ipv4_gateway = "192.168.1.254"
+
+icmp_echo_identifier = 42
+icmp_echo_sequence = 0
 
 -- Core Functions
 function initialize ()
@@ -252,11 +261,26 @@ function ipv4_event (interface, packet)
 end
 
 -- ICMP
-function icmp_send(interface, destination, ttl, type, code, payload)
+function icmp_send (interface, destination, ttl, type, code, payload)
 	local packet = ICMP_TEMPLATE
 	packet.type = type
 	packet.code = code
 	packet.payload = payload
 
 	ipv4_send(interface, destination, IPV4_PROTOCOL_ICMP, ttl, packet)
+end
+
+function icmp_ping_ttl (interface, destination, ttl)
+	local packet = ICMP_TEMPLATE_ECHO
+	packet.identifier = icmp_echo_identifier
+	packet.sequence = icmp_echo_sequence
+	packet.payload = icmp_echo_identifier
+
+	icmp_send(interface, destination, ttl, ICMP_TYPE_ECHO, 0, packet)
+
+	icmp_echo_sequence = icmp_echo_sequence + 1
+end
+
+function icmp_ping (interface, destination)
+	icmp_ping_ttl(interface, destination, IPV4_DEFAULT_TTL)
 end
