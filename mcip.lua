@@ -104,9 +104,7 @@ function receive_raw ()
 	local packet = json.decode(message) -- parse JSON to Lua object
 	local interface = get_interface(modem_side)
 
-	-- On Receive Events
-	arp_event(interface, packet)
-	ipv4_event(interface, packet)
+	ethernet_event(interface, packet)
 
 	return interface, packet
 end
@@ -175,6 +173,19 @@ function ethernet_send (interface, target, type, message)
 	send_raw(interface, json.encode(packet))
 end
 
+function ethernet_event (interface, packet)
+	-- Local Processing
+
+	-- Other Processing
+
+	-- Propagate Event
+	if packet.ethertype == ETHERNET_TYPE_ARP then 
+		arp_event(interface, packet, packet.payload)
+	elseif packet.ethertype == ETHERNET_TYPE_IPV4 then 
+		ipv4_event(interface, packet, packet.payload)
+	end
+end
+
 -- ARP
 function arp_send (interface, protocol, operation, sha, spa, tha, tpa)
 	local packet = ARP_TEMPLATE
@@ -198,16 +209,20 @@ function arp_reply (interface, tha, tpa)
 	arp_send(interface, ETHERNET_TYPE_ARP, ARP_REPLY, MAC, ipv4_address, tha, tpa)
 end
 
-function arp_event (interface, packet)
-	if packet.ethertype == ETHERNET_TYPE_ARP then
-		local arp = packet.payload
-		if arp.operation == ARP_REQUEST then
-			if arp.tpa == ipv4_address then 
-				arp_reply(interface, arp.sha, arp.spa)
-			end
+function arp_event (interface, raw, arp)
+	-- Local Processing
+	if arp.operation == ARP_REQUEST then
+		if arp.tpa == ipv4_address then 
+			arp_reply(interface, arp.sha, arp.spa)
 		end
-		arp_cache[arp.spa] = arp.sha
 	end
+	arp_cache[arp.spa] = arp.sha
+
+	-- Other Processing
+	ipv4_process_queue()
+
+	-- Propagate Event
+
 end
 
 -- IPv4
@@ -248,7 +263,7 @@ function ipv4_send (interface, destination, protocol, ttl, payload)
 	ethernet_send(interface, arp_cache[destination], ETHERNET_TYPE_IPV4, packet)
 end
 
-function ipv4_event (interface, packet)
+function ipv4_process_queue ()
 	if ipv4_packet_queue ~= nil then
 		for i, queue_packet in ipairs(ipv4_packet_queue) do
 			local data = json.decode(queue_packet)
@@ -258,7 +273,15 @@ function ipv4_event (interface, packet)
 			end
 		end
 	end
-	if packet.ethertype == ETHERNET_TYPE_IPV4 && packet.payload.protocol == 1 then
+end
+
+function ipv4_event (interface, raw, ipv4)
+	-- Local Processing
+
+	-- Other Processing
+
+	-- Propagate Event
+	if ip.protocol == 1 then
 		icmp_event(interface, packet)
 	end
 end
@@ -288,15 +311,19 @@ function icmp_ping (interface, destination)
 	icmp_ping_ttl(interface, destination, IPV4_DEFAULT_TTL)
 end
 
-function icmp_event (interface, packet)
-	local icmp = packet.payload.payload
-
+function icmp_event (interface, raw, icmp)
+	-- Local Processing
 	if icmp.type == ICMP_TYPE_ECHO then
-		local packet_ = ICMP_TEMPLATE_ECHO
-		packet_.identifier = icmp.payload.identifier
-		packet_.sequence = icmp.payload.sequence
-		packet_.payload = icmp.payload.payload
+		local packet = ICMP_TEMPLATE_ECHO
+		packet.identifier = icmp.payload.identifier
+		packet.sequence = icmp.payload.sequence
+		packet.payload = icmp.payload.payload
 
 		icmp_send(interface, packet.payload.destination, packet.payload.ttl, ICMP_TYPE_ECHO_REPLY, 0, packet_)
 	end
+
+	-- Other Processing
+
+	-- Propagate Event
+	
 end
