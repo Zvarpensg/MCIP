@@ -276,7 +276,7 @@ function ipv4_event (interface, raw, ipv4)
 
 	-- Propagate Event
 	if ipv4.protocol == 1 then
-		icmp_event(interface, packet, ipv4.payload)
+		icmp_event(interface, raw, ipv4.payload)
 	end
 end
 
