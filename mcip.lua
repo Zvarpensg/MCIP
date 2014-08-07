@@ -256,7 +256,7 @@ function ipv4_event (interface, packet)
 				ipv4_send(data.interface, data.destination, data.protocol, data.ttl, data.payload)
 				ipv4_packet_queue = table.remove(ipv4_packet_queue, queue_packet)
 			end
-			if (data.protocol  == 1) then
+			if data.protocol  == 1 then
 				icmp_event(interface, packet)
 			end
 		end
@@ -288,10 +288,21 @@ function icmp_ping (interface, destination)
 	icmp_ping_ttl(interface, destination, IPV4_DEFAULT_TTL)
 end
 
+function icmp_ping_reply (interface, destination, ttl)
+	local packet = ICMP_TEMPLATE_ECHO
+	packet.identifier = icmp_echo_identifier
+	packet.sequence = icmp_echo_sequence
+	packet.payload = os.time()
+
+	icmp_send(interface, destination, ttl, ICMP_TYPE_ECHO_REPLY, 0, packet)
+
+	icmp_echo_sequence = icmp_echo_sequence + 1
+end
+
 function icmp_event (interface, packet)
 	local data = json.decode(packet)
 	local payload = data.payload
-	if (payload.type == ICMP_TYPE_ECHO) then
-		icmp_ping(interface, data.destination)
+	if payload.type == ICMP_TYPE_ECHO then
+		icmp_ping_reply(interface, data.destination, IPV4_DEFAULT_TTL)
 	end
 end
