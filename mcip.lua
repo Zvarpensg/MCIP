@@ -104,6 +104,7 @@ function receive_raw ()
 	local packet = json.decode(message) -- parse JSON to Lua object
 	local interface = get_interface(modem_side)
 
+	-- Events: Pre-Processing, Local Processing, Other Processing, Event Propagation
 	ethernet_event(interface, packet)
 
 	return interface, packet
@@ -174,10 +175,6 @@ function ethernet_send (interface, target, type, message)
 end
 
 function ethernet_event (interface, packet)
-	-- Local Processing
-
-	-- Other Processing
-
 	-- Propagate Event
 	if packet.ethertype == ETHERNET_TYPE_ARP then 
 		arp_event(interface, packet, packet.payload)
@@ -220,9 +217,6 @@ function arp_event (interface, raw, arp)
 
 	-- Other Processing
 	ipv4_process_queue()
-
-	-- Propagate Event
-
 end
 
 -- IPv4
@@ -276,13 +270,13 @@ function ipv4_process_queue ()
 end
 
 function ipv4_event (interface, raw, ipv4)
-	-- Local Processing
-
-	-- Other Processing
+	-- Pre-Processing
+	raw.payload.ttl = raw.payload.ttl - 1
+	ipv4 = raw.payload
 
 	-- Propagate Event
-	if ip.protocol == 1 then
-		icmp_event(interface, packet)
+	if ipv4.protocol == 1 then
+		icmp_event(interface, packet, ipv4.payload)
 	end
 end
 
@@ -320,10 +314,5 @@ function icmp_event (interface, raw, icmp)
 		packet.payload = icmp.payload.payload
 
 		icmp_send(interface, packet.payload.destination, packet.payload.ttl, ICMP_TYPE_ECHO_REPLY, 0, packet_)
-	end
-
-	-- Other Processing
-
-	-- Propagate Event
-	
+	end	
 end
