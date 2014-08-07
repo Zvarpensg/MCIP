@@ -26,7 +26,7 @@
 	"payload": "" // packet contents
 }
 
-// ICMP - Layer 3
+// ICMP - Layer 3 (encapsulated by IPv4)
 {
 	"type": 8, // ICMP type. ping request, (or 0 for ping reply)
 	"code": 0, // Subtype, depends on type. see wikipedia/ICMP#Control_messages for details
