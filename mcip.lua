@@ -274,7 +274,7 @@ function icmp_ping_ttl (interface, destination, ttl)
 	local packet = ICMP_TEMPLATE_ECHO
 	packet.identifier = icmp_echo_identifier
 	packet.sequence = icmp_echo_sequence
-	packet.payload = icmp_echo_identifier
+	packet.payload = os.time()
 
 	icmp_send(interface, destination, ttl, ICMP_TYPE_ECHO, 0, packet)
 
