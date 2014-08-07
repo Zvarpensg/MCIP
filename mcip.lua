@@ -39,7 +39,7 @@ IPV4_PROTOCOL_TCP  = 6
 IPV4_PROTOCOL_UDP  = 17
 
 -- ICMP
-ICMP_TEMPLATE = json.decode("{ 'type': 8, 'code':0, payload:''");
+ICMP_TEMPLATE = json.decode("{ 'type': 8, 'code':0, payload:'' }");
 -- END CONSTANTS
 
 -- Runtime Variables
