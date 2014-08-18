@@ -25,3 +25,17 @@
 	"destination": "192.168.1.2", // destination IP address
 	"payload": "" // packet contents
 }
+
+// ICMP - Layer 3 (encapsulated by IPv4)
+{
+	"type": 8, // ICMP type. ping request, (or 0 for ping reply)
+	"code": 0, // Subtype, depends on type. see wikipedia/ICMP#Control_messages for details
+	"payload": "" // packet contents
+}
+
+	// ICMP [Type = 0 || 8] Echo Reply / Echo
+	{
+		"identifier": 0, // increment per ping session or fixed if don't reset sequence
+		"sequence": 0, // increment per ping packet in a session
+		"payload": "" // string including timestamp of sent time
+	}
