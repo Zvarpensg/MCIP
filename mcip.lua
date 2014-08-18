@@ -127,11 +127,13 @@ function loop ()
 					end
 				elseif protocol == IPV4 then
 					if packet.ethertype == ETHERNET_TYPE_IPV4 then
-						if packet.payload.destination == ipv4_address or state == PROMISCUOUS then send = true end
+						if (packet.payload.destination == ipv4_address or packet.payload.destination == IPV4_BROADCAST) 
+							or state == PROMISCUOUS then send = true end
 					end
 				elseif protocol == ICMP then
 					if packet.ethertype == ETHERNET_TYPE_IPV4 and packet.payload.protocol == IPV4_PROTOCOL_ICMP then
-						send = true
+						if (packet.payload.destination == ipv4_address or packet.payload.destination == IPV4_BROADCAST) 
+							or state == PROMISCUOUS then send = true end
 					end
 				end
 			end
