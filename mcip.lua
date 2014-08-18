@@ -44,6 +44,7 @@ ICMP_TEMPLATE = json.decode("{ 'type': 8, 'code': 0, 'payload': '' }")
 ICMP_TYPE_ECHO_REPLY = 0
 ICMP_TYPE_DESTINATION_UNREACHABLE = 3
 ICMP_TYPE_ECHO = 8
+ICMP_TYPE_TIME_EXCEEDED = 11
 ICMP_TEMPLATE_ECHO = json.decode("{ 'identifier': 0, 'sequence': 0, 'payload': '' }")
 
 -- END CONSTANTS
@@ -280,6 +281,11 @@ function ipv4_event (interface, raw, ipv4)
 	-- Pre-Processing
 	raw.payload.ttl = raw.payload.ttl - 1
 	ipv4 = raw.payload
+
+	if raw.payload.ttl == 0 then 
+		icmp_send(interface, raw.payload.source, IPV4_DEFAULT_TTL, ICMP_TYPE_TIME_EXCEEDED, 0, "")
+		return
+	end
 
 	-- Other Processing
 	arp_cache[ipv4.source] = raw.source

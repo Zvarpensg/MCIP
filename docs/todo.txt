@@ -1,11 +1,7 @@
 TODO
  - Protocols
   - IP
-   - Subnets
-    - Broadcast
-    - Routing
-   - TTL
-  - ICMP
+   - Routing
   - RIPv2
   - UDP
   - TCP
