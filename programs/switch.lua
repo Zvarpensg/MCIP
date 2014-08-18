@@ -1,7 +1,8 @@
 os.loadAPI("lib/json")
 os.loadAPI("mcip")
 
-mcip.ipv4_initialize("192.168.1.3", "255.255.255.0", "192.168.1.254")
+mcip.initialize()
+mcip.ipv4_initialize("eth0", "192.168.1.3", "255.255.255.0", "192.168.1.254")
 mcip.filter(mcip.ETHERNET, mcip.PROMISCUOUS)
 
 mcip.run_with(function() 

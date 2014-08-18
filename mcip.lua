@@ -59,10 +59,7 @@ ipv4_packet_queue = {}
 -- Networking Variables
 arp_cache = {} -- table for caching ARP lookups. arp_cache[protocol address] = HW address
 
-ipv4_enabled = false
-ipv4_address = IPV4_LOCALHOST -- TODO: find better defaults
-ipv4_subnet  = "255.255.255.0"
-ipv4_gateway = "192.168.1.254"
+ipv4_interfaces = {} -- interface = address
 
 icmp_echo_identifier = 42
 icmp_echo_sequence = 0
@@ -123,17 +120,17 @@ function loop ()
 				elseif protocol == ARP then
 					if packet.ethertype == ETHERNET_TYPE_ARP then
 						if packet.payload.tha == MAC 
-							or packet.payload.tpa == ipv4_address 
+							or packet.payload.tpa == ipv4_interfaces[interface] 
 							or state == PROMISCUOUS then send = true end
 					end
 				elseif protocol == IPV4 then
 					if packet.ethertype == ETHERNET_TYPE_IPV4 then
-						if (packet.payload.destination == ipv4_address or packet.payload.destination == IPV4_BROADCAST) 
+						if (packet.payload.destination == ipv4_interfaces[interface] or packet.payload.destination == IPV4_BROADCAST) 
 							or state == PROMISCUOUS then send = true end
 					end
 				elseif protocol == ICMP then
 					if packet.ethertype == ETHERNET_TYPE_IPV4 and packet.payload.protocol == IPV4_PROTOCOL_ICMP then
-						if (packet.payload.destination == ipv4_address or packet.payload.destination == IPV4_BROADCAST) 
+						if (packet.payload.destination == ipv4_interfaces[interface] or packet.payload.destination == IPV4_BROADCAST) 
 							or state == PROMISCUOUS then send = true end
 					end
 				end
@@ -205,18 +202,18 @@ end
 
 function arp_request (interface, tpa)
 	if arp_cache[tpa] == nil then
-		arp_send(interface, ETHERNET_TYPE_IPV4, ARP_REQUEST, MAC, ipv4_address, 0, tpa)
+		arp_send(interface, ETHERNET_TYPE_IPV4, ARP_REQUEST, MAC, ipv4_interfaces[interface], 0, tpa)
 	end
 end
 
 function arp_reply (interface, tha, tpa)
-	arp_send(interface, ETHERNET_TYPE_IPV4, ARP_REPLY, MAC, ipv4_address, tha, tpa)
+	arp_send(interface, ETHERNET_TYPE_IPV4, ARP_REPLY, MAC, ipv4_interfaces[interface], tha, tpa)
 end
 
 function arp_event (interface, raw, arp)
 	-- Local Processing
 	if arp.operation == ARP_REQUEST then
-		if arp.tpa == ipv4_address then 
+		if arp.tpa == ipv4_interfaces[interface] then 
 			arp_reply(interface, arp.sha, arp.spa)
 		end
 	end
@@ -227,17 +224,11 @@ function arp_event (interface, raw, arp)
 end
 
 -- IPv4
-function ipv4_initialize (address, subnet, gateway)
-	if next(interfaces) == nil then
-		initialize()
-	end
+function ipv4_initialize (interface, address, subnet, gateway)
+	ipv4_interfaces[interface] = address
 
-	ipv4_enabled = true
-	ipv4_address = address
-	ipv4_subnet = subnet
-	ipv4_gateway = gateway
 	arp_cache[IPV4_BROADCAST] = MAC_BROADCAST
-	arp_cache[ipv4_address] = MAC
+	arp_cache[address] = MAC
 end 
 
 function ipv4_send (interface, destination, protocol, ttl, payload)
@@ -256,7 +247,7 @@ function ipv4_send (interface, destination, protocol, ttl, payload)
 	end
 
 	local packet = IPV4_TEMPLATE
-	packet.source = ipv4_address
+	packet.source = ipv4_interfaces[interface]
 	packet.destination = destination
 	packet.protocol = protocol
 	packet.ttl = ttl

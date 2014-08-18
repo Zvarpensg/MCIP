@@ -1,6 +1,7 @@
 os.loadAPI("mcip")
 
-mcip.ipv4_initialize("192.168.1.1", "255.255.255.0", "192.168.1.254")
+mcip.initialize()
+mcip.ipv4_initialize("eth0", "192.168.1.1", "255.255.255.0", "192.168.1.254")
 mcip.filter(mcip.ICMP, mcip.ENABLED)
 
 mcip.run_with(function() 
