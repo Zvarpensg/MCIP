@@ -42,8 +42,7 @@
 
 //UDP - Layer 4
 {
-	"sp": 1337, //Source port - if unused, 0
-	"dp": 1337, //Destination port
-	"length": 8, //Packet length - Max
+	"ports": 1337, // Source port - if unused, 0
+	"portd": 1337, // Destination port
 	"payload": ""
 }

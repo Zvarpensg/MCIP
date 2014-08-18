@@ -8,6 +8,7 @@ ETHERNET = 1
 ARP = 2
 IPV4 = 3
 ICMP = 4
+UDP = 5
 
 DISABLED = 0
 ENABLED = 1
@@ -46,6 +47,11 @@ ICMP_TYPE_DESTINATION_UNREACHABLE = 3
 ICMP_TYPE_ECHO = 8
 ICMP_TEMPLATE_ECHO = json.decode("{ 'identifier': 0, 'sequence': 0, 'payload': '' }")
 
+-- UDP (Layer 4)
+UDP_TEMPLATE = json.decode("{ 'ports': 49152, 'portd': 49152, 'payload': ''}")
+UDP_EPHEMERAL_START = 49152
+UDP_EPHEMERAL_STOP = 65535
+
 -- END CONSTANTS
 
 -- Runtime Variables
@@ -56,7 +62,8 @@ packet_filters = {} -- protocol type with disabled/enabled/promiscuous
 ipv4_packet_queue = {}
 
 -- Networking Variables
-arp_cache = {} -- table for caching ARP lookups. arp_cache[protocol address] = HW address
+arp_cache     = {} -- table for caching ARP lookups. arp_cache[protocol address] = HW address
+udp_port_lock = {} -- list of UDP ports in use
 
 ipv4_enabled = false
 ipv4_address = IPV4_LOCALHOST -- TODO: find better defaults
@@ -131,6 +138,10 @@ function loop ()
 					end
 				elseif protocol == ICMP then
 					if packet.ethertype == ETHERNET_TYPE_IPV4 and packet.payload.protocol == IPV4_PROTOCOL_ICMP then
+						send = true
+					end
+				elseif protocol == UDP then
+					if packet.ethertype == ETHERNET_TYPE_IPV4 and packet.payload.protocol == IPV4_PROTOCOL_UDP then
 						send = true
 					end
 				end
@@ -283,8 +294,10 @@ function ipv4_event (interface, raw, ipv4)
 	arp_cache[ipv4.source] = raw.source
 
 	-- Propagate Event
-	if ipv4.protocol == 1 then
+	if ipv4.protocol == IPV4_PROTOCOL_ICMP then
 		icmp_event(interface, raw, ipv4.payload)
+	elseif ipv4.protocol == IPV4_PROTOCOL_UDP then
+		udp_event(interface, raw, ipv4.payload)
 	end
 end
 
@@ -323,4 +336,34 @@ function icmp_event (interface, raw, icmp)
 
 		icmp_send(interface, raw.payload.source, raw.payload.ttl, ICMP_TYPE_ECHO_REPLY, 0, packet)
 	end	
+end
+
+-- UDP
+function udp_send(interface, destination, port, payload)
+	local packet = UDP_TEMPLATE
+	packet.ports = udp_find_ephemeral()
+	packet.portd = port
+	packet.payload = payload
+	ipv4_send(interface, destination, IPV4_PROTOCOL_UDP, IPV4_DEFAULT_TTL, packet)
+end
+
+function udp_listen(port, callback) -- Callback takes one parameter, packet
+	udp_port_lock[port] = callback
+end
+
+function udp_event(interface, raw, payload)
+	callback = udp_port_lock[payload.dp]
+	print("Function: ", callback)
+	if (callback) then
+		callback(payload)
+	end
+end
+
+function udp_find_ephemeral()
+	for port=UDP_EPHEMERAL_START,UDP_EPHEMERAL_STOP do
+		if (udp_port_lock[port] == nil) then
+			return port
+		end
+	end
+	error("All ports in use.") -- Please download more ports for your computer
 end

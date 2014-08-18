@@ -2,13 +2,13 @@ os.loadAPI("lib/json")
 os.loadAPI("mcip")
 
 mcip.ipv4_initialize("192.168.1.2", "255.255.255.0", "192.168.1.254")
-mcip.filter(mcip.IPV4, mcip.ENABLED)
+mcip.filter(mcip.UDP, mcip.ENABLED)
 
 mcip.run_with(function() 
+	mcip.udp_listen(49152, function(packet)
+		print(packet.payload)
+	end)
 	while true do
-		local event, interface, packet = os.pullEvent("mcip")
-		if packet.ethertype == mcip.ETHERNET_TYPE_IPV4 then
-			print("Source: "..packet.payload.source.." / Target: "..packet.payload.destination.." / Payload: "..packet.payload.payload)
-		end
+		sleep(5)
 	end
 end)
