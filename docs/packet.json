@@ -39,3 +39,11 @@
 		"sequence": 0, // increment per ping packet in a session
 		"payload": "" // string including timestamp of sent time
 	}
+
+//UDP - Layer 4
+{
+	"sp": 1337, //Source port - if unused, 0
+	"dp": 1337, //Destination port
+	"length": 8, //Packet length - Max
+	"payload": ""
+}
