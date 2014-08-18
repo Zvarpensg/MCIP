@@ -37,10 +37,10 @@ IPV4_LOCALHOST = "127.0.0.1"
 IPV4_PROTOCOL_ICMP = 1
 IPV4_PROTOCOL_TCP  = 6
 IPV4_PROTOCOL_UDP  = 17
-IPV4_DEFAULT_TTL = 64
+IPV4_DEFAULT_TTL = 128
 
 -- ICMP (Layer 4)
-ICMP_TEMPLATE = json.decode("{ 'type': 8, 'code':0, payload:'' }");
+ICMP_TEMPLATE = json.decode("{ 'type': 8, 'code': 0, 'payload': '' }")
 ICMP_TYPE_ECHO_REPLY = 0
 ICMP_TYPE_DESTINATION_UNREACHABLE = 3
 ICMP_TYPE_ECHO = 8
@@ -129,6 +129,10 @@ function loop ()
 					if packet.ethertype == ETHERNET_TYPE_IPV4 then
 						if packet.payload.destination == ipv4_address or state == PROMISCUOUS then send = true end
 					end
+				elseif protocol == ICMP then
+					if packet.ethertype == ETHERNET_TYPE_IPV4 and packet.payload.protocol == IPV4_PROTOCOL_ICMP then
+						send = true
+					end
 				end
 			end
 		end
@@ -198,12 +202,12 @@ end
 
 function arp_request (interface, tpa)
 	if arp_cache[tpa] == nil then
-		arp_send(interface, ETHERNET_TYPE_ARP, ARP_REQUEST, MAC, ipv4_address, 0, tpa)
+		arp_send(interface, ETHERNET_TYPE_IPV4, ARP_REQUEST, MAC, ipv4_address, 0, tpa)
 	end
 end
 
 function arp_reply (interface, tha, tpa)
-	arp_send(interface, ETHERNET_TYPE_ARP, ARP_REPLY, MAC, ipv4_address, tha, tpa)
+	arp_send(interface, ETHERNET_TYPE_IPV4, ARP_REPLY, MAC, ipv4_address, tha, tpa)
 end
 
 function arp_event (interface, raw, arp)
@@ -230,6 +234,7 @@ function ipv4_initialize (address, subnet, gateway)
 	ipv4_subnet = subnet
 	ipv4_gateway = gateway
 	arp_cache[IPV4_BROADCAST] = MAC_BROADCAST
+	arp_cache[ipv4_address] = MAC
 end 
 
 function ipv4_send (interface, destination, protocol, ttl, payload)
@@ -263,7 +268,7 @@ function ipv4_process_queue ()
 			local data = json.decode(queue_packet)
 			if arp_cache[data.destination] ~= nil then
 				ipv4_send(data.interface, data.destination, data.protocol, data.ttl, data.payload)
-				ipv4_packet_queue = table.remove(ipv4_packet_queue, queue_packet)
+				table.remove(ipv4_packet_queue, i)
 			end
 		end
 	end
@@ -273,6 +278,9 @@ function ipv4_event (interface, raw, ipv4)
 	-- Pre-Processing
 	raw.payload.ttl = raw.payload.ttl - 1
 	ipv4 = raw.payload
+
+	-- Other Processing
+	arp_cache[ipv4.source] = raw.source
 
 	-- Propagate Event
 	if ipv4.protocol == 1 then
@@ -294,7 +302,7 @@ function icmp_ping_ttl (interface, destination, ttl)
 	local packet = ICMP_TEMPLATE_ECHO
 	packet.identifier = icmp_echo_identifier
 	packet.sequence = icmp_echo_sequence
-	packet.payload = os.time()
+	packet.payload = os.clock()
 
 	icmp_send(interface, destination, ttl, ICMP_TYPE_ECHO, 0, packet)
 
@@ -313,6 +321,6 @@ function icmp_event (interface, raw, icmp)
 		packet.sequence = icmp.payload.sequence
 		packet.payload = icmp.payload.payload
 
-		icmp_send(interface, packet.payload.destination, packet.payload.ttl, ICMP_TYPE_ECHO_REPLY, 0, packet_)
+		icmp_send(interface, raw.payload.source, raw.payload.ttl, ICMP_TYPE_ECHO_REPLY, 0, packet)
 	end	
 end

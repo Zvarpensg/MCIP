@@ -7,7 +7,7 @@ local message, target = "foo", "192.168.1.2"
 
 mcip.run_with(function() 
 	while true do
-		mcip.ipv4_send("eth0", message, 0, 128, target)
+		mcip.ipv4_send("eth0", target, 0, 128, message)
 		print("Sent '"..message.."' to "..target.." from "..mcip.ipv4_address)
 		sleep(5)
 	end
