@@ -232,7 +232,7 @@ function ipv4_initialize (interface, address, subnet, gateway)
 	arp_cache[address] = MAC
 
 	-- Invert subnet into host mask and take the logarithm base 2 of it to determine prefix
-	prefix = math.ceil(math.log10(bit32.bxor(math.pow(2, 32) - 1, ip_to_binary(subnet))) / math.log10(2))
+	prefix = math.ceil(math.log10(bit.bxor(math.pow(2, 32) - 1, ip_to_binary(subnet))) / math.log10(2))
 	route_add(address.."/"..prefix, IPV4_BROADCAST, interface)
 	route_add("0.0.0.0/0", gateway, interface)
 end 
@@ -297,17 +297,17 @@ end
 
 function ip_to_binary (address)
 	a, b, c, d = string.match(address, "(%d+).(%d+).(%d+).(%d+)")
-	return (bit32.lshift(tonumber(a), 24)) 
-		 + (bit32.lshift(tonumber(b), 16)) 
-		 + (bit32.lshift(tonumber(c), 8)) 
+	return (bit.blshift(tonumber(a), 24)) 
+		 + (bit.blshift(tonumber(b), 16)) 
+		 + (bit.blshift(tonumber(c), 8)) 
 		 + tonumber(d)
 end
 
 function route_add (cidr, route, interface)
 	network, prefix = string.match(cidr, "(.+)/(%d+)")
 	
-	netmask = bit32.bxor(math.pow(2, 32 - tonumber(prefix)) - 1, math.pow(2, 32) - 1)
-	network_short = bit32.band(ip_to_binary(network), netmask)
+	netmask = bit.bxor(math.pow(2, 32 - tonumber(prefix)) - 1, math.pow(2, 32) - 1)
+	network_short = bit.band(ip_to_binary(network), netmask)
 
 	ipv4_routes[cidr] = {
 		route = route,
