@@ -60,6 +60,7 @@ ipv4_packet_queue = {}
 arp_cache = {} -- table for caching ARP lookups. arp_cache[protocol address] = HW address
 
 ipv4_interfaces = {} -- interface = address
+ipv4_routes = {} -- cidr = { route: "", interface: "", network: "", netmask: "" }
 
 icmp_echo_identifier = 42
 icmp_echo_sequence = 0
@@ -229,9 +230,16 @@ function ipv4_initialize (interface, address, subnet, gateway)
 
 	arp_cache[IPV4_BROADCAST] = MAC_BROADCAST
 	arp_cache[address] = MAC
+
+	-- Invert subnet into host mask and take the logarithm base 2 of it to determine prefix
+	prefix = math.ceil(math.log10(bit32.bxor(math.pow(2, 32) - 1, ip_to_binary(subnet))) / math.log10(2))
+	route_add(address.."/"..prefix, IPV4_BROADCAST, interface)
+	route_add("0.0.0.0/0", gateway, interface)
 end 
 
 function ipv4_send (interface, destination, protocol, ttl, payload)
+	-- TODO: Routing!
+
 	if arp_cache[destination] == nil then
 		local data = json.decode("{ 'interface': '', 'destination': '', 'protocol': 0, 'ttl': 0, 'payload': '' }")
 		data.interface = interface
@@ -285,6 +293,32 @@ function ipv4_event (interface, raw, ipv4)
 	if ipv4.protocol == 1 then
 		icmp_event(interface, raw, ipv4.payload)
 	end
+end
+
+function ip_to_binary (address)
+	a, b, c, d = string.match(address, "(%d+).(%d+).(%d+).(%d+)")
+	return (bit32.lshift(tonumber(a), 24)) 
+		 + (bit32.lshift(tonumber(b), 16)) 
+		 + (bit32.lshift(tonumber(c), 8)) 
+		 + tonumber(d)
+end
+
+function route_add (cidr, route, interface)
+	network, prefix = string.match(cidr, "(.+)/(%d+)")
+	
+	netmask = bit32.bxor(math.pow(2, 32 - tonumber(prefix)) - 1, math.pow(2, 32) - 1)
+	network_short = bit32.band(ip_to_binary(network), netmask)
+
+	ipv4_routes[cidr] = {
+		route = route,
+		interface = interface,
+		network = network_short,
+		netmask = netmask
+	}
+end
+
+function route_remove (cidr)
+	ipv4_routes[cidr] = nil
 end
 
 -- ICMP

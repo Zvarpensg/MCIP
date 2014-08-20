@@ -21,6 +21,7 @@ TODO
  - Implementations
   - Rail system
  - Code Cleanliness
+  - Change event system to be based on callbacks
   - Error checking / exception handling
   - Member access modifiers
   - Documentation
