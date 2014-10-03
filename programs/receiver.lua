@@ -9,7 +9,7 @@ mcip.run_with(function()
 	while true do
 		local event, interface, packet = os.pullEvent("mcip")
 		if packet.ethertype == mcip.ETHERNET_TYPE_IPV4 then
-			print("Source: "..packet.payload.source.." / Target: "..packet.payload.destination.." / Payload: "..packet.payload.payload)
+			print("Source: "..packet.payload.source.." / Target: "..packet.payload.destination.." / Payload: "..json.encode(packet.payload.payload))
 		end
 	end
 end)
