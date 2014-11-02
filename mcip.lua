@@ -91,8 +91,10 @@ function initialize ()
 				tower = tower + 1
 			end
 
-			interfaces[interface] = device
-			interface_sides[side] = interface
+			if interface ~= nil then
+				interfaces[interface] = device
+				interface_sides[side] = interface
+			end
 		end
 	end
 end
@@ -116,13 +118,13 @@ function receive_raw ()
 	local event, side, message, distance
 	parallel.waitForAny(
 		function() -- block for modem message
-			local event, side, _, _, message, distance = os.pullEventRaw("modem_message")
+			event, side, _, _, message, distance = os.pullEventRaw("modem_message")
 		end,
 		function() -- block for BitNet Tower (MoarPeripherals) message
-			local event, side, message, distance = os.pullEventRaw("bitnet_message")
+			event, side, message, distance = os.pullEventRaw("bitnet_message")
 		end
 	)
-
+	
 	local packet = json.decode(message) -- parse JSON to Lua object
 	local interface = get_interface(side)
 
