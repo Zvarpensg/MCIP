@@ -68,20 +68,30 @@ icmp_echo_sequence = 0
 -- Core Functions
 function initialize ()
 	local SIDES = {"front", "back", "left", "right", "top", "bottom"}
-	local wired, wireless = 0, 0
+	local wired, wireless, tower = 0, 0, 0
+
 	for i, side in ipairs(SIDES) do
-		if peripheral.getType(side) == "modem" then
-			local modem = peripheral.wrap(side)
+		local device = peripheral.wrap(side)
+
+		if device ~= nil then
 			local interface = nil
-			if modem.isWireless() then
-				interface = "wlan"..wireless
-				wireless = wireless + 1
-			else
-				interface = "eth"..wired
-				wired = wired + 1
+
+			if peripheral.getType(side) == "modem" then
+				if device.isWireless() then
+					interface = "wlan"..wireless
+					wireless = wireless + 1
+				else
+					interface = "eth"..wired
+					wired = wired + 1
+				end
+
+				device.open(CHANNEL)
+			elseif peripheral.getType(side) == "bitnet_tower" then
+				interface = "tower"..tower
+				tower = tower + 1
 			end
-			modem.open(CHANNEL)
-			interfaces[interface] = modem
+
+			interfaces[interface] = device
 			interface_sides[side] = interface
 		end
 	end
@@ -95,13 +105,26 @@ function stop ()
 end
 
 function send_raw (interface, frame)
-	interfaces[interface].transmit(CHANNEL, CHANNEL, frame)
+	if string.find(interface, "tower") == 1 then
+		interfaces[interface].transmit(frame)
+	else
+		interfaces[interface].transmit(CHANNEL, CHANNEL, frame)
+	end
 end
 
 function receive_raw ()
-	local event, modem_side, sender_channel, reply_channel, message, distance = os.pullEventRaw("modem_message") -- block for physical message
+	local event, side, message, distance
+	parallel.waitForAny(
+		function() -- block for modem message
+			local event, side, _, _, message, distance = os.pullEventRaw("modem_message")
+		end,
+		function() -- block for BitNet Tower (MoarPeripherals) message
+			local event, side, message, distance = os.pullEventRaw("bitnet_message")
+		end
+	)
+
 	local packet = json.decode(message) -- parse JSON to Lua object
-	local interface = get_interface(modem_side)
+	local interface = get_interface(side)
 
 	-- Events: Pre-Processing, Local Processing, Other Processing, Event Propagation
 	ethernet_event(interface, packet)
