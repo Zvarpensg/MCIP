@@ -52,6 +52,7 @@ ICMP_TEMPLATE_ECHO = json.decode("{ 'identifier': 0, 'sequence': 0, 'payload': '
 -- Runtime Variables
 interfaces = {} -- table associating interface names with modems
 interface_sides = {} -- table associating block sides with interface names
+default_interface = nil -- first interface initialized, referenced as "default"
 packet_filters = {} -- protocol type with disabled/enabled/promiscuous
 
 ipv4_packet_queue = {}
@@ -67,7 +68,7 @@ icmp_echo_sequence = 0
 
 -- Core Functions
 function initialize ()
-	local SIDES = {"front", "back", "left", "right", "top", "bottom"}
+	local SIDES = {"front", "back", "top", "bottom", "left", "right"}
 	local wired, wireless, tower = 0, 0, 0
 
 	for i, side in ipairs(SIDES) do
@@ -92,6 +93,11 @@ function initialize ()
 			end
 
 			if interface ~= nil then
+				if default_interface == nil then
+					default_interface = interface
+					interfaces["default"] = device
+				end
+
 				interfaces[interface] = device
 				interface_sides[side] = interface
 			end
@@ -107,6 +113,10 @@ function stop ()
 end
 
 function send_raw (interface, frame)
+	if interface == "default" then
+		interface = default_interface
+	end
+
 	if string.find(interface, "tower") == 1 then
 		interfaces[interface].transmit(frame)
 	else
@@ -251,6 +261,11 @@ end
 
 -- IPv4
 function ipv4_initialize (interface, address, subnet, gateway)
+	if interface == "default" or interface == default_interface then 
+		ipv4_interfaces["default"] = address
+		interface = default_interface
+	end
+
 	ipv4_interfaces[interface] = address
 
 	arp_cache[IPV4_BROADCAST] = MAC_BROADCAST

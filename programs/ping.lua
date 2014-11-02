@@ -3,12 +3,12 @@ os.loadAPI("mcip")
 TIMEOUT_THRESHOLD = 10
 
 mcip.initialize()
-mcip.ipv4_initialize("eth0", "192.168.1.1", "255.255.255.0", "192.168.1.254")
+mcip.ipv4_initialize("default", "192.168.1.1", "255.255.255.0", "192.168.1.254")
 mcip.filter(mcip.ICMP, mcip.ENABLED)
 
 mcip.run_with(function() 
 	while true do
-		mcip.icmp_ping("eth0", "192.168.1.2")
+		mcip.icmp_ping("default", "192.168.1.2")
 		parallel.waitForAny(
 			function()
 				local event, interface, packet = os.pullEvent("mcip")
