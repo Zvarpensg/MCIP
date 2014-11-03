@@ -66,6 +66,20 @@ ipv4_routes = {} -- cidr = { route: "", interface: "", network: "", netmask: "" 
 icmp_echo_identifier = 42
 icmp_echo_sequence = 0
 
+-- Virtual Devices
+Loopback = {}
+Loopback.__index = Loopback
+
+function Loopback.new()
+	local self = setmetatable({}, Loopback)
+	self.queue = {}
+	return self
+end
+
+function Loopback.transmit(channel, replyChannel, message)
+	os.queueEvent("modem_message", "top", channel, replyChannel, message, 0)
+end
+
 -- Core Functions
 function initialize ()
 	local SIDES = {"front", "back", "top", "bottom", "left", "right"}
@@ -103,6 +117,9 @@ function initialize ()
 			end
 		end
 	end
+
+	interfaces["lo"] = Loopback.new()
+	if default_interface == nil then default_interface = "lo" end
 end
 
 function stop ()
@@ -160,7 +177,7 @@ function loop ()
 							or state == PROMISCUOUS then send = true end
 					end
 				elseif protocol == IPV4 then
-					if packet.ethertype == ETHERNET_TYPE_IPV4 then
+					if packet.target == MAC and packet.ethertype == ETHERNET_TYPE_IPV4 then
 						if (packet.payload.destination == ipv4_interfaces[interface] or packet.payload.destination == IPV4_BROADCAST) 
 							or state == PROMISCUOUS then send = true end
 					end
@@ -275,6 +292,7 @@ function ipv4_initialize (interface, address, subnet, gateway)
 	prefix = 32 - math.ceil(math.log10(bit.bxor(math.pow(2, 32) - 1, ip_to_binary(subnet))) / math.log10(2))
 	route_add(address.."/"..prefix, IPV4_BROADCAST, interface)
 	route_add("0.0.0.0/0", gateway, interface)
+	route_add("127.0.0.0/8", "127.0.0.1", "lo")
 end 
 
 function ipv4_send (destination, protocol, ttl, payload)
