@@ -272,15 +272,25 @@ function ipv4_initialize (interface, address, subnet, gateway)
 	arp_cache[address] = MAC
 
 	-- Invert subnet into host mask and take the logarithm base 2 of it to determine prefix
-	prefix = math.ceil(math.log10(bit.bxor(math.pow(2, 32) - 1, ip_to_binary(subnet))) / math.log10(2))
+	prefix = 32 - math.ceil(math.log10(bit.bxor(math.pow(2, 32) - 1, ip_to_binary(subnet))) / math.log10(2))
 	route_add(address.."/"..prefix, IPV4_BROADCAST, interface)
 	route_add("0.0.0.0/0", gateway, interface)
 end 
 
-function ipv4_send (interface, destination, protocol, ttl, payload)
-	-- TODO: Routing!
+function ipv4_send (destination, protocol, ttl, payload)
+	dest_binary = ip_to_binary(destination)
 
-	if arp_cache[destination] == nil then
+	route_choice = { netmask = -1 }
+	for cidr, route in pairs(ipv4_routes) do
+		if bit.band(dest_binary, route.netmask) == route.network and route.netmask > route_choice.netmask then
+			route_choice = route
+		end
+	end
+
+	interface = route_choice.interface
+	hostdestination = route_choice.route
+
+	if arp_cache[hostdestination] == nil then
 		local data = json.decode("{ 'interface': '', 'destination': '', 'protocol': 0, 'ttl': 0, 'payload': '' }")
 		data.interface = interface
 		data.destination = destination
@@ -301,7 +311,7 @@ function ipv4_send (interface, destination, protocol, ttl, payload)
 	packet.ttl = ttl
 	packet.payload = payload
 
-	ethernet_send(interface, arp_cache[destination], ETHERNET_TYPE_IPV4, packet)
+	ethernet_send(interface, arp_cache[hostdestination], ETHERNET_TYPE_IPV4, packet)
 end
 
 function ipv4_process_queue ()
@@ -309,7 +319,7 @@ function ipv4_process_queue ()
 		for i, queue_packet in ipairs(ipv4_packet_queue) do
 			local data = json.decode(queue_packet)
 			if arp_cache[data.destination] ~= nil then
-				ipv4_send(data.interface, data.destination, data.protocol, data.ttl, data.payload)
+				ipv4_send(data.destination, data.protocol, data.ttl, data.payload)
 				table.remove(ipv4_packet_queue, i)
 			end
 		end
@@ -322,7 +332,7 @@ function ipv4_event (interface, raw, ipv4)
 	ipv4 = raw.payload
 
 	if raw.payload.ttl == 0 then 
-		icmp_send(interface, raw.payload.source, IPV4_DEFAULT_TTL, ICMP_TYPE_TIME_EXCEEDED, 0, "")
+		icmp_send(raw.payload.source, IPV4_DEFAULT_TTL, ICMP_TYPE_TIME_EXCEEDED, 0, "")
 		return
 	end
 
@@ -362,22 +372,22 @@ function route_remove (cidr)
 end
 
 -- ICMP
-function icmp_send (interface, destination, ttl, type, code, payload)
+function icmp_send (destination, ttl, type, code, payload)
 	local packet = ICMP_TEMPLATE
 	packet.type = type
 	packet.code = code
 	packet.payload = payload
 
-	ipv4_send(interface, destination, IPV4_PROTOCOL_ICMP, ttl, packet)
+	ipv4_send(destination, IPV4_PROTOCOL_ICMP, ttl, packet)
 end
 
-function icmp_ping_ttl (interface, destination, ttl)
+function icmp_ping_ttl (destination, ttl)
 	local packet = ICMP_TEMPLATE_ECHO
 	packet.identifier = icmp_echo_identifier
 	packet.sequence = icmp_echo_sequence
 	packet.payload = os.clock()
 
-	icmp_send(interface, destination, ttl, ICMP_TYPE_ECHO, 0, packet)
+	icmp_send(destination, ttl, ICMP_TYPE_ECHO, 0, packet)
 
 	icmp_echo_sequence = icmp_echo_sequence + 1
 end
@@ -394,6 +404,6 @@ function icmp_event (interface, raw, icmp)
 		packet.sequence = icmp.payload.sequence
 		packet.payload = icmp.payload.payload
 
-		icmp_send(interface, raw.payload.source, raw.payload.ttl, ICMP_TYPE_ECHO_REPLY, 0, packet)
+		icmp_send(raw.payload.source, raw.payload.ttl, ICMP_TYPE_ECHO_REPLY, 0, packet)
 	end	
 end
