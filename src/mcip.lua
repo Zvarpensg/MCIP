@@ -1,3 +1,10 @@
+--------------------------------------------
+-- MCIP
+-- v0.4
+-- https://github.com/Zvarpensg/MCIP
+-- Copyright (c) 2014-2015 MCIP Contributors
+--------------------------------------------
+
 os.loadAPI("lib/json")
 
 -- CONSTANTS
