@@ -1,32 +1,28 @@
 TODO
- - Protocols
-  - IP
-   - Routing
-  - RIPv2
-  - UDP
-  - TCP
-  - DHCP
-  - DNS
-  - ZURP (Zvarpensg Unified Request Protocol)
-  - Less Important Stuff
-   - SSH
-   - [T]FTP
- - Other Features
-  - VLAN support
-  - ARP Probe
-  - MCIPoT (MCIP over Tesseract [or other item-transfer layer 1])
-  - Settings per interface
-  - Clean up and work on standardizing library API
-   - Make different core protocol types more extensible
- - Implementations
-  - Rail system
- - Code Cleanliness
-  - Change event system to be based on callbacks
-  - Error checking / exception handling
-  - Member access modifiers
-  - Documentation
- - Decide if some superfluous header fields (lengths, checksums, etc) should be 
-   implemented for real-world accuracy.
+	- IP
+		- Routing (make sure it works!)
+	- UDP
+	- TCP
+	- RIPv2
+	- DHCP
+	- DNS
+	- ZURP (Zvarpensg Unified Request Protocol)
+	- 802.1q
+		- VLANs
+		- STP
+	- ARP Probe
+	- MCIPoT (MCIP over Tesseract [or other item-transfer layer 1])
+		- Settings per interface
+	- Standardize library API
+		- Make different core protocol types more extensible
+	- Implementations
+		- Rail system
+		- SSH
+		- [T]FTP
+	- Code Cleanliness
+		- Error checking / exception handling
+		- Member access modifiers
+		- Documentation
 
 BUGS
- - None right now! (that we know of)
+	- None right now! (that we know of)
